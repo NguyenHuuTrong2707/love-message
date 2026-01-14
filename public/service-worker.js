@@ -1,6 +1,23 @@
 // Basic service worker for handling push notifications
 // This file is intentionally simple and independent of backend logic.
 
+// Install event - skip waiting để activate ngay
+self.addEventListener("install", (event) => {
+  self.skipWaiting();
+  console.log("Service Worker: Install event");
+});
+
+// Activate event - claim clients ngay
+self.addEventListener("activate", (event) => {
+  event.waitUntil(
+    Promise.all([
+      self.clients.claim(), // Take control of all pages immediately
+      // Clean up old service workers if needed
+    ])
+  );
+  console.log("Service Worker: Activate event");
+});
+
 self.addEventListener("push", (event) => {
   if (!event.data) {
     return;
@@ -41,10 +58,14 @@ self.addEventListener("notificationclick", (event) => {
   // Mở app khi click vào notification
   event.waitUntil(
     clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
+      // Kiểm tra linh hoạt hơn - tìm client có cùng origin
+      const currentOrigin = self.location.origin;
+      
       // Nếu đã có window mở, focus vào đó
       for (let i = 0; i < clientList.length; i++) {
         const client = clientList[i];
-        if (client.url === "/" && "focus" in client) {
+        // Kiểm tra origin thay vì URL chính xác để tương thích với cả iOS và Android
+        if (client.url.startsWith(currentOrigin) && "focus" in client) {
           return client.focus();
         }
       }
@@ -52,6 +73,9 @@ self.addEventListener("notificationclick", (event) => {
       if (clients.openWindow) {
         return clients.openWindow("/");
       }
+    }).catch((error) => {
+      // Xử lý lỗi để không làm gián đoạn notification
+      console.error("Error handling notification click:", error);
     })
   );
 });

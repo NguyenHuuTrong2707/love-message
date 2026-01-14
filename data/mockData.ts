@@ -1,6 +1,18 @@
 // Mock data cho Memory Vault - đủ 12 tháng (mỗi tháng ít nhất 1 tin)
 // Quy ước date: "DD Tháng M" (M là số 1..12)
-const mockMessages = [
+
+export interface Message {
+  id: number;
+  date: string;
+  title: string;
+  content: string;
+  time: string;
+  isFavorite: boolean;
+  bgColor: 'pink' | 'beige';
+  fullContent: string;
+}
+
+export const mockMessages: Message[] = [
   // Tháng 12
   {
     id: 1,
@@ -136,33 +148,21 @@ const mockMessages = [
 ];
 
 // Hàm để lấy tin nhắn theo tháng
-function getMessagesByMonth(month) {
-  // month format: "10", "9", "8", etc.
+export function getMessagesByMonth(month: string): Message[] {
   return mockMessages.filter(msg => {
-    // Extract month number from "24 Tháng 10" -> "10"
     const dateParts = msg.date.split(' ');
-    const msgMonth = dateParts[dateParts.length - 1]; // Lấy số tháng cuối cùng
+    const msgMonth = dateParts[dateParts.length - 1];
     return msgMonth === month;
   });
 }
 
 // Hàm để lấy tin nhắn mới nhất
-function getLatestMessage() {
-  return mockMessages[0]; // Tin nhắn đầu tiên là mới nhất
+export function getLatestMessage(): Message {
+  return mockMessages[0];
 }
 
 // Hàm để lấy tin nhắn theo ID
-function getMessageById(id) {
+export function getMessageById(id: number): Message | undefined {
   return mockMessages.find(msg => msg.id === id);
-}
-
-// Export để sử dụng trong các file khác
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = {
-    mockMessages,
-    getMessagesByMonth,
-    getLatestMessage,
-    getMessageById
-  };
 }
 
