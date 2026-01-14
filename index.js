@@ -165,12 +165,6 @@ app.get("*", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
-// Export app cho Vercel sử dụng như 1 Serverless Function
-export default app;
-
-// Chỉ listen khi chạy local (không phải môi trường Vercel Serverless)
-if (!process.env.VERCEL) {
-  app.listen(PORT, () => {
-    console.log(`🚀 Server running at http://localhost:${PORT}`);
-  });
-}
+app.listen(PORT, () => {
+  console.log(`🚀 Server running at http://localhost:${PORT}`);
+});
