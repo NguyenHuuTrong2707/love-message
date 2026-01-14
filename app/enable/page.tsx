@@ -2,14 +2,14 @@
 
 import { useEffect } from 'react'
 import { usePushNotification } from '@/hooks/usePushNotification'
-import HomeScreen from '@/components/HomeScreen'
+import EnableScreen from '@/components/EnableScreen'
 
-export default function Home() {
+export default function EnablePage() {
   const { registerServiceWorker } = usePushNotification()
 
   useEffect(() => {
     registerServiceWorker()
   }, [registerServiceWorker])
 
-  return <HomeScreen />
+  return <EnableScreen />
 }
