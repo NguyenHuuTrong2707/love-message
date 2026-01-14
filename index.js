@@ -27,8 +27,8 @@ if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
   console.warn("⚠️ VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY chưa được cấu hình. Push test sẽ không hoạt động.");
 }
 
-// Tạm thời lưu subscription cuối cùng trong bộ nhớ
-let lastSubscription = null;
+// Lưu tất cả subscriptions trong bộ nhớ (sau này sẽ lưu DB)
+let subscriptions = [];
 
 // --- ROUTES ---
 
@@ -51,15 +51,32 @@ app.post("/subscribe", (req, res) => {
   const subscription = req.body;
   console.log("SUBSCRIPTION:", JSON.stringify(subscription, null, 2));
 
-  // Lưu tạm vào biến (sau này sẽ lưu DB)
-  lastSubscription = subscription;
+  // Kiểm tra subscription hợp lệ
+  if (!subscription || !subscription.endpoint) {
+    return res.status(400).json({ error: "Invalid subscription" });
+  }
+
+  // Kiểm tra xem subscription đã tồn tại chưa (dựa vào endpoint)
+  const existingIndex = subscriptions.findIndex(
+    (sub) => sub.endpoint === subscription.endpoint
+  );
+
+  if (existingIndex >= 0) {
+    // Cập nhật subscription nếu đã tồn tại
+    subscriptions[existingIndex] = subscription;
+    console.log(`📝 Updated existing subscription: ${subscription.endpoint}`);
+  } else {
+    // Thêm subscription mới
+    subscriptions.push(subscription);
+    console.log(`✅ Added new subscription. Total: ${subscriptions.length}`);
+  }
 
   res.sendStatus(201);
 });
 
-// Gửi push test đến subscription cuối cùng
+// Gửi push test đến TẤT CẢ subscriptions
 app.get("/test-push", async (req, res) => {
-  if (!lastSubscription) {
+  if (subscriptions.length === 0) {
     res.status(400).send("Chưa có subscription nào. Hãy bật thông báo trên client trước.");
     return;
   }
@@ -71,20 +88,70 @@ app.get("/test-push", async (req, res) => {
     return;
   }
 
-  try {
-    await webpush.sendNotification(
-      lastSubscription,
-      JSON.stringify({
-        title: "💌 Tin nhắn từ anh",
-        body: "Anh chỉ muốn thử xem em có nhận được không.",
-      })
-    );
+  // Thêm tag unique để iOS không gộp các notification lại với nhau
+  const notificationPayload = {
+    title: "💌 Tin nhắn từ anh",
+    body: "Anh chỉ muốn thử xem em có nhận được không.",
+    tag: `push-${Date.now()}`, // Tag unique cho mỗi lần gửi
+  };
 
-    res.send("Push sent");
-  } catch (err) {
-    console.error("Error sending push:", err);
-    res.status(500).send("Lỗi khi gửi push");
-  }
+  const results = {
+    success: 0,
+    failed: 0,
+    errors: [],
+  };
+
+  // Gửi đến tất cả subscriptions
+  const promises = subscriptions.map(async (subscription, index) => {
+    try {
+      await webpush.sendNotification(
+        subscription,
+        JSON.stringify(notificationPayload)
+      );
+      results.success++;
+      console.log(`✅ Push sent successfully to subscription ${index + 1}`);
+    } catch (err) {
+      results.failed++;
+      const errorMsg = `Subscription ${index + 1}: ${err.message}`;
+      results.errors.push(errorMsg);
+      console.error(`❌ Error sending to subscription ${index + 1}:`, err);
+
+      // Tự động xóa subscription không hợp lệ (410 Gone, 404 Not Found)
+      if (err.statusCode === 410 || err.statusCode === 404) {
+        const removeIndex = subscriptions.findIndex(
+          (sub) => sub.endpoint === subscription.endpoint
+        );
+        if (removeIndex >= 0) {
+          subscriptions.splice(removeIndex, 1);
+          console.log(`🗑️ Removed invalid subscription ${index + 1} (${err.statusCode})`);
+        }
+      }
+    }
+  });
+
+  await Promise.all(promises);
+
+  res.json({
+    message: `Push sent to ${subscriptions.length} device(s)`,
+    results: {
+      total: subscriptions.length,
+      success: results.success,
+      failed: results.failed,
+      errors: results.errors,
+    },
+  });
+});
+
+// API: Xem danh sách subscriptions hiện tại (để debug)
+app.get("/api/subscriptions", (req, res) => {
+  res.json({
+    count: subscriptions.length,
+    subscriptions: subscriptions.map((sub, index) => ({
+      index: index + 1,
+      endpoint: sub.endpoint,
+      // Không gửi keys về client để bảo mật
+    })),
+  });
 });
 
 app.listen(PORT, () => {
