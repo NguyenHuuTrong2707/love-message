@@ -1,8 +1,13 @@
 import express from "express";
 import dotenv from "dotenv";
 import webpush from "web-push";
+import path from "path";
+import { fileURLToPath } from "url";
 
 dotenv.config();
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -10,8 +15,8 @@ const PORT = process.env.PORT || 3000;
 // Middleware
 app.use(express.json());
 
-// Serve static files
-app.use(express.static("public"));
+// Serve static files từ thư mục public (dùng đường dẫn tuyệt đối)
+app.use(express.static(path.join(__dirname, "public")));
 
 // --- VAPID CONFIG ---
 const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || "";
@@ -152,6 +157,12 @@ app.get("/api/subscriptions", (req, res) => {
       // Không gửi keys về client để bảo mật
     })),
   });
+});
+
+// Fallback: mọi route khác trả về index.html
+// Đảm bảo GET "/" và các route front-end khác không bị "Cannot GET /"
+app.get("*", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
 app.listen(PORT, () => {
